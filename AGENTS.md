@@ -58,7 +58,7 @@
 - 认证：NextAuth
 - 定时任务：Vercel Cron
 - AI：OpenAI SDK
-- 部署：Vercel
+- 部署：腾讯云轻量服务器 + Docker Compose + Caddy；数据库使用 Supabase PostgreSQL
 - 测试：Vitest
 
 ## 关键文档
@@ -70,6 +70,7 @@
 - `docs/architecture.md`：系统架构图和模块边界
 - `docs/database.md`：数据库关系和约束
 - `docs/api.md`：REST API 设计
+- `docs/deployment.md`：腾讯云 Docker + Supabase 部署流程
 - `docs/project-structure.md`：目录结构和分层原则
 - `prisma/schema.prisma`：真实数据库模型
 
@@ -85,7 +86,7 @@
 - TanStack Query hook 放在 `src/hooks/`。
 - Zustand 只保存轻量 UI 状态，不保存服务端权威数据。
 - 数据访问统一通过 Prisma，不在组件中直接访问数据库。
-- Cron 入口必须校验 `CRON_SECRET`。
+- Cron 入口必须校验 `CRON_SECRET`；自托管部署通过 `deploy/docker-compose.prod.yml` 中的 `cron` 容器每小时触发。
 - AI 摘要失败不能影响文章入库和已有 Briefing 展示。
 
 ## Next.js 约束
@@ -148,6 +149,7 @@ npm run db:migrate
 - 确认无用代码后直接删除，不留注释说明。
 - 不提交真实 `.env`。
 - `.env.example` 应保留并随配置变化更新。
+- `.env.production.example` 应保留并随生产部署配置变化更新。
 - 不提交 `node_modules`、`.next`、`*.tsbuildinfo`。
 
 ## 常用命令
@@ -158,12 +160,15 @@ npm run lint
 npm run typecheck
 npm run test
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing npm run db:generate
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing npm run db:deploy
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing NEXTAUTH_SECRET=test-nextauth-secret CRON_SECRET=test-cron-secret npm run build
 ```
 
 说明：
 
 - `next build` 在受限沙箱中可能因 Turbopack 内部端口绑定失败，需要提升权限重跑。
+- 生产数据库迁移使用 `npm run db:deploy`，不要在生产环境使用 `npm run db:migrate`。
+- Supabase 连接优先使用 Session Pooler，除非确认服务器支持 IPv6 或已购买 IPv4 add-on。
 - `npm audit --audit-level=high` 需要联网；不要擅自执行 `npm audit fix --force`，因为可能引入破坏性版本变更。
 
 ## 提交规范

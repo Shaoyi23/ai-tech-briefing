@@ -120,21 +120,22 @@ npm run db:studio    # 打开 Prisma Studio
 - [数据库设计](./docs/database.md)
 - [API 设计](./docs/api.md)
 - [项目目录结构](./docs/project-structure.md)
+- [腾讯云 Docker + Supabase 部署流程](./docs/deployment.md)
 
 这些文档中的架构图和关系图使用 Mermaid 编写，可在 GitHub Markdown 中直接渲染。
 
 ## 部署说明
 
-项目已包含 [vercel.json](./vercel.json)，Cron 配置如下：
+当前推荐部署方式：
 
-```json
-{
-  "path": "/api/cron/fetch-feeds",
-  "schedule": "0 * * * *"
-}
-```
+- 应用：腾讯云轻量服务器 + Docker Compose
+- 数据库：Supabase PostgreSQL
+- HTTPS：Caddy 自动签发证书
+- Cron：Docker 内部 Cron 容器每小时调用抓取接口
 
-部署到 Vercel 后，需要在 Vercel Project Settings 中配置 `.env.example` 中列出的环境变量。
+详见 [腾讯云 Docker + Supabase 部署流程](./docs/deployment.md)。
+
+项目仍保留 [vercel.json](./vercel.json)，如果未来要部署到 Vercel，可以继续使用 Vercel Cron。
 
 ## 安全说明
 

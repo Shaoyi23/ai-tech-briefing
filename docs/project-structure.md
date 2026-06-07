@@ -12,8 +12,12 @@
 │   ├── api.md
 │   ├── architecture.md
 │   ├── database.md
+│   ├── deployment.md
 │   ├── prd.md
 │   └── project-structure.md
+├── deploy/
+│   ├── Caddyfile
+│   └── docker-compose.prod.yml
 ├── prisma/
 │   └── schema.prisma
 ├── public/
@@ -81,3 +85,4 @@
 - `stores/`：Zustand 状态
 - `types/`：共享类型定义
 - `tests/`：单元测试和 service 测试
+- `deploy/`：生产部署相关 Docker Compose 和 Caddy 配置
