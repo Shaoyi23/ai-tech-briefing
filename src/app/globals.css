@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4efe4;
+  --foreground: #171a18;
+  --card: #fffaf0;
+  --card-foreground: #171a18;
+  --primary: #0e9488;
+  --primary-foreground: #effdfa;
+  --secondary: #e8dec9;
+  --secondary-foreground: #211d16;
+  --muted: #ece3d3;
+  --muted-foreground: #6c6257;
+  --border: #dacdb8;
+  --input: #d6cab6;
+  --ring: #20b8aa;
+  --sidebar: #171a18;
+  --sidebar-foreground: #f6eedf;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --font-sans: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "SFMono-Regular", "Cascadia Code", "Liberation Mono", ui-monospace,
+    monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
