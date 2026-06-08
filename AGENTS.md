@@ -7,7 +7,7 @@
 - 默认使用中文沟通，除非用户明确要求其他语言。
 - 回答简洁直接，优先给结论、变更点和验证结果。
 - 任务不清晰时先确认，不主动扩展用户没有要求的需求。
-- 不在输出中打印密钥、Token、OAuth Secret、数据库连接串等敏感信息。
+- 不在输出中打印密钥、Token、数据库连接串等敏感信息。
 - 修改文件前先理解现有代码结构，不做无关重构。
 
 ## 产品目标
@@ -27,7 +27,7 @@
 
 当前只开发 MVP：
 
-- 用户系统：登录、注册、GitHub OAuth、用户资料
+- 当前实现为单用户模式，不接入登录和 OAuth
 - RSS 订阅：添加、删除、分类
 - 内容抓取：每小时抓取 RSS Feed，保存标题、正文、发布时间、来源、原文链接
 - 去重：避免重复抓取同一 Feed 下的文章
@@ -55,7 +55,6 @@
 - 后端：Next.js Route Handlers
 - 数据库：PostgreSQL
 - ORM：Prisma 7
-- 认证：NextAuth
 - 定时任务：Vercel Cron
 - AI：OpenAI SDK
 - 部署：腾讯云轻量服务器 + Docker Compose + Caddy；数据库使用 Supabase PostgreSQL
@@ -79,14 +78,15 @@
 ## 架构原则
 
 - 保持单体 Next.js 架构，不拆微服务。
-- Route Handler 只负责请求解析、鉴权、调用 service、返回响应。
+- Route Handler 只负责请求解析、参数校验、调用 service、返回响应。
 - 业务逻辑放在 `src/services/`。
 - 基础设施封装放在 `src/lib/`。
 - UI 组件放在 `src/components/`，按业务域拆分。
 - TanStack Query hook 放在 `src/hooks/`。
 - Zustand 只保存轻量 UI 状态，不保存服务端权威数据。
 - 数据访问统一通过 Prisma，不在组件中直接访问数据库。
-- Cron 入口必须校验 `CRON_SECRET`；自托管部署通过 `deploy/docker-compose.prod.yml` 中的 `cron` 容器每小时触发。
+- 当前为单用户 MVP，通过 `getAppUser()` 维护系统用户。
+- 如果配置了 `CRON_SECRET`，Cron 入口才校验鉴权；自托管部署通过 `deploy/docker-compose.prod.yml` 或 `deploy/docker-compose.server.yml` 中的 `cron` 容器每小时触发。
 - AI 摘要失败不能影响文章入库和已有 Briefing 展示。
 
 ## Next.js 约束
@@ -104,7 +104,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 避免在模块顶层初始化数据库、OpenAI、邮件等外部客户端。
 - Prisma Client 使用 `getPrisma()` 懒初始化。
 - 不重新引入 `next/font/google`，避免离线或 CI 构建时拉取 Google Fonts 失败。
-- 受保护页面应通过服务端 session 判断并重定向。
+- 当前不引入登录态或 session 校验，页面默认可直接访问。
 
 ## Prisma 7 约束
 
@@ -125,11 +125,9 @@ npm run db:migrate
 
 ## 数据权限
 
-- 用户只能管理自己的 Feed、FeedCategory、Bookmark。
-- 用户只能查看自己 Feed 抓取到的 Article。
-- Bookmark 必须绑定用户和文章。
-- Cron 可扫描所有启用 Feed，但必须受 `CRON_SECRET` 保护。
-- 不要添加绕过权限校验的 API。
+- 当前项目是单用户 MVP，Feed、分类、收藏都绑定到系统用户。
+- Bookmark 仍然绑定用户和文章，但这里的用户是系统用户。
+- Cron 可扫描所有启用 Feed；只有配置了 `CRON_SECRET` 时才需要校验。
 
 ## UI 规范
 
@@ -161,7 +159,7 @@ npm run typecheck
 npm run test
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing npm run db:generate
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing npm run db:deploy
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing NEXTAUTH_SECRET=test-nextauth-secret CRON_SECRET=test-cron-secret npm run build
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_tech_briefing npm run build
 ```
 
 说明：

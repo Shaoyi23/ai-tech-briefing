@@ -39,9 +39,14 @@ export function fail(error: unknown) {
 
 export function assertCronAuth(request: Request) {
   const expected = process.env.CRON_SECRET;
+
+  if (!expected) {
+    return;
+  }
+
   const token = request.headers.get("authorization")?.replace("Bearer ", "");
 
-  if (!expected || token !== expected) {
+  if (token !== expected) {
     throw new ApiError("UNAUTHORIZED", "Cron Secret 错误", 401);
   }
 }

@@ -8,7 +8,7 @@
 
 MVP 已包含以下基础能力：
 
-- 用户登录、注册、GitHub OAuth、用户资料
+- 单用户模式，不要求登录即可使用
 - RSS Feed 添加、删除、分类管理
 - 每小时定时抓取 Feed 内容
 - 文章去重、入库、来源记录
@@ -32,7 +32,6 @@ V2 只保留设计方案，暂不开发：
 - 后端：Next.js Route Handlers
 - 数据库：PostgreSQL
 - ORM：Prisma
-- 认证：NextAuth
 - 定时任务：Vercel Cron
 - AI：OpenAI SDK
 - 部署：Vercel
@@ -45,10 +44,10 @@ V2 只保留设计方案，暂不开发：
 npm install
 ```
 
-复制环境变量示例：
+本地开发建议使用 `.env.local`。可以先参考本地示例文件：
 
 ```bash
-cp .env.example .env
+cp .env.local.example .env.local
 ```
 
 启动 PostgreSQL：
@@ -88,13 +87,9 @@ http://localhost:3000
 关键变量：
 
 - `DATABASE_URL`：PostgreSQL 连接串
-- `NEXTAUTH_URL`：NextAuth 应用地址
-- `NEXTAUTH_SECRET`：NextAuth 密钥
-- `GITHUB_CLIENT_ID`：GitHub OAuth Client ID
-- `GITHUB_CLIENT_SECRET`：GitHub OAuth Client Secret
 - `OPENAI_API_KEY`：OpenAI API Key
 - `OPENAI_MODEL`：摘要模型，默认 `gpt-4o-mini`
-- `CRON_SECRET`：保护 Cron 接口的密钥
+- `CRON_SECRET`：可选，用于保护抓取接口；本地可以留空
 
 ## 常用命令
 
@@ -140,6 +135,6 @@ npm run db:studio    # 打开 Prisma Studio
 ## 安全说明
 
 - 不要提交真实 `.env` 文件
-- 不要在日志或输出中打印 Token、API Key、OAuth Secret
-- `/api/cron/fetch-feeds` 必须通过 `CRON_SECRET` 调用
-- 用户只能访问自己的 Feed、分类和收藏数据
+- 不要在日志或输出中打印 Token、API Key、数据库连接串
+- 如果配置了 `CRON_SECRET`，则 `/api/cron/fetch-feeds` 需要带鉴权头
+- 当前实现为单用户模式，Feed、分类和收藏都绑定到系统用户

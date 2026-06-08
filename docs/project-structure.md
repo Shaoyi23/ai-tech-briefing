@@ -51,7 +51,7 @@
 
 ```txt
 /                  -> 首页
-/login             -> 登录 / 注册
+/login             -> 功能预留占位页
 /dashboard         -> Briefing 信息流
 /feeds             -> RSS Feed 管理
 /articles/[id]     -> 文章详情
@@ -62,7 +62,6 @@
 ## API 路由
 
 ```txt
-/api/auth/[...nextauth]        -> NextAuth
 /api/me                        -> 当前用户资料
 /api/feed-categories           -> 分类列表 / 创建
 /api/feed-categories/:id       -> 分类更新 / 删除

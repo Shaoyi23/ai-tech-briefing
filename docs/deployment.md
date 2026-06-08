@@ -2,6 +2,8 @@
 
 本项目可以部署到自有腾讯云轻量服务器，数据库使用 Supabase 托管 PostgreSQL。
 
+如果你暂时不做域名解析，也可以先用服务器公网 IP 部署，直接通过 `http://服务器IP` 访问。
+
 ## 1. 推荐架构
 
 ```mermaid
@@ -12,7 +14,6 @@ flowchart TB
 
   Cron["Docker Cron 容器"] --> App
   App --> Supabase["Supabase PostgreSQL"]
-  App --> GitHub["GitHub OAuth"]
   App --> OpenAI["OpenAI API"]
 ```
 
@@ -20,7 +21,6 @@ flowchart TB
 
 - 腾讯云服务器只运行 Web 应用、反向代理和 Cron。
 - Supabase 只作为 PostgreSQL 托管数据库使用。
-- NextAuth 仍由本项目处理，不使用 Supabase Auth。
 - Caddy 自动申请和续期 HTTPS 证书。
 - Docker Compose 管理 app、cron、migrate、caddy 四个服务。
 
@@ -68,6 +68,12 @@ postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres?sslm
 
 不需要开放 PostgreSQL 端口，因为数据库在 Supabase。
 
+如果你当前先不用域名，确保服务器放行：
+
+```txt
+80/tcp
+```
+
 ## 5. 上传代码
 
 在服务器上拉取仓库：
@@ -98,12 +104,8 @@ nano .env.production
 ```txt
 APP_DOMAIN=你的域名
 DATABASE_URL=Supabase Session Pooler 连接串
-NEXTAUTH_URL=https://你的域名
-NEXTAUTH_SECRET=随机强密钥
-GITHUB_CLIENT_ID=GitHub OAuth Client ID
-GITHUB_CLIENT_SECRET=GitHub OAuth Client Secret
 OPENAI_API_KEY=OpenAI API Key
-CRON_SECRET=随机强密钥
+CRON_SECRET=可选随机强密钥
 ```
 
 生成随机密钥示例：
@@ -112,21 +114,7 @@ CRON_SECRET=随机强密钥
 openssl rand -base64 32
 ```
 
-## 7. GitHub OAuth 配置
-
-在 GitHub 创建 OAuth App：
-
-```txt
-Homepage URL:
-https://你的域名
-
-Authorization callback URL:
-https://你的域名/api/auth/callback/github
-```
-
-然后把生成的 Client ID / Client Secret 填入 `.env.production`。
-
-## 8. 初始化 Supabase 数据库
+## 7. 初始化 Supabase 数据库
 
 首次部署前执行 Prisma 生产迁移：
 
@@ -136,11 +124,32 @@ docker compose -f deploy/docker-compose.prod.yml --profile tools run --rm migrat
 
 后续每次 Schema 变更后，也执行同一条命令。
 
-## 9. 启动服务
+如果你当前只是为了先跑通单用户 MVP，也可以临时走手动初始化：
+
+1. 打开 Supabase Dashboard
+2. 进入 SQL Editor
+3. 执行 [deploy/supabase-init.sql](/Users/lando/Project/TechPulse/deploy/supabase-init.sql)
+
+注意：这份 SQL 只适合空数据库的首次初始化。后续正式部署仍建议改回 Prisma migration 流程。
+
+## 8. 启动服务
 
 ```bash
 docker compose -f deploy/docker-compose.prod.yml up -d --build app cron caddy
 ```
+
+如果你当前不做域名解析，直接使用服务器公网 IP，推荐先用这个更简单的 Compose 文件：
+
+```bash
+docker compose -f deploy/docker-compose.server.yml up -d --build app cron
+```
+
+这个版本：
+
+- 不启动 Caddy
+- 不申请 HTTPS 证书
+- 直接把容器 `3000` 端口映射到宿主机 `80`
+- 访问地址为 `http://服务器公网IP`
 
 如果只是想在本地检查 Compose 配置是否能解析，可以使用示例环境变量文件：
 
@@ -154,10 +163,22 @@ APP_ENV_FILE=../.env.production.example docker compose -f deploy/docker-compose.
 docker compose -f deploy/docker-compose.prod.yml ps
 ```
 
+如果你走无域名部署，则改成：
+
+```bash
+docker compose -f deploy/docker-compose.server.yml ps
+```
+
 查看日志：
 
 ```bash
 docker compose -f deploy/docker-compose.prod.yml logs -f app
+```
+
+无域名部署：
+
+```bash
+docker compose -f deploy/docker-compose.server.yml logs -f app
 ```
 
 查看 Cron 日志：
@@ -166,7 +187,7 @@ docker compose -f deploy/docker-compose.prod.yml logs -f app
 docker compose -f deploy/docker-compose.prod.yml logs -f cron
 ```
 
-## 10. 更新部署
+## 9. 更新部署
 
 ```bash
 git pull
@@ -174,7 +195,7 @@ docker compose -f deploy/docker-compose.prod.yml --profile tools run --rm migrat
 docker compose -f deploy/docker-compose.prod.yml up -d --build app cron caddy
 ```
 
-## 11. 停止服务
+## 10. 停止服务
 
 ```bash
 docker compose -f deploy/docker-compose.prod.yml down
@@ -188,10 +209,10 @@ docker compose -f deploy/docker-compose.prod.yml down -v
 
 注意：删除 Caddy 卷会导致证书重新申请。
 
-## 12. 部署注意事项
+## 11. 部署注意事项
 
 - 不要提交 `.env.production`。
-- 不要把 Supabase 数据库密码、OpenAI Key、GitHub Secret 写进 README 或日志。
+- 不要把 Supabase 数据库密码、OpenAI Key 写进 README 或日志。
 - 生产环境使用 `npm run db:deploy`，不要使用 `npm run db:migrate`。
 - 如果 Supabase 连接失败，优先确认服务器是否支持 IPv6；不确定时使用 Session Pooler。
 - 如果 Caddy 证书申请失败，检查域名 DNS 是否已指向服务器 IP，以及 80 / 443 是否开放。

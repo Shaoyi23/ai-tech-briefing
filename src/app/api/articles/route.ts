@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 import { getPagination } from "@/lib/pagination";
 import { fail, ok } from "@/lib/response";
 import { articleQuerySchema } from "@/lib/validations";
@@ -7,7 +7,7 @@ import { listArticles } from "@/services/article-service";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const pagination = getPagination(request.nextUrl.searchParams);
     const filters = articleQuerySchema.parse({
       query: request.nextUrl.searchParams.get("query") ?? undefined,

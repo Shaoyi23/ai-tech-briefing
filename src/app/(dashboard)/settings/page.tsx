@@ -6,10 +6,7 @@ import { Input } from "@/components/ui/input";
 export default function SettingsPage() {
   return (
     <section className="flex max-w-2xl flex-col gap-6">
-      <PageHeader
-        description="管理基础资料、OAuth 绑定状态和后续通知偏好。"
-        title="Settings"
-      />
+      <PageHeader description="管理当前系统用户的基础资料。" title="Settings" />
       <Card>
         <CardHeader>
           <CardTitle>用户资料</CardTitle>

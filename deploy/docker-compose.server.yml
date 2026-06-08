@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runner
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    ports:
+      - "80:3000"
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: migrator
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    profiles:
+      - tools
+
+  cron:
+    image: curlimages/curl:8.17.0
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $${CRON_SECRET}" \
+            http://app:3000/api/cron/fetch-feeds || true
+          sleep 3600
+        done
+    depends_on:
+      - app
+    restart: unless-stopped

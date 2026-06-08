@@ -16,15 +16,15 @@ export default function Home() {
             并生成中文技术简报。
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/login">
+            <Link href="/dashboard">
               <Button size="lg">
-                开始使用
+                进入 Briefing
                 <ArrowRight data-icon="inline-end" />
               </Button>
             </Link>
-            <Link href="/dashboard">
+            <Link href="/feeds">
               <Button size="lg" variant="outline">
-                查看 Dashboard
+                管理 Feeds
               </Button>
             </Link>
           </div>

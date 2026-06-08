@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 import { created, fail, ok } from "@/lib/response";
 import { feedCategoryCreateSchema } from "@/lib/validations";
 import {
@@ -9,7 +9,7 @@ import {
 
 export async function GET() {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const categories = await listFeedCategories(user.id);
 
     return ok(
@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const input = feedCategoryCreateSchema.parse(await request.json());
     const category = await createFeedCategory(user.id, input);
 

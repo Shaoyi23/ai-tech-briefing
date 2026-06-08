@@ -11,9 +11,6 @@ prisma/schema.prisma
 核心模型：
 
 - `User`
-- `Account`
-- `Session`
-- `VerificationToken`
 - `FeedCategory`
 - `Feed`
 - `Article`
@@ -24,8 +21,6 @@ prisma/schema.prisma
 
 ```mermaid
 erDiagram
-  User ||--o{ Account : has
-  User ||--o{ Session : has
   User ||--o{ FeedCategory : owns
   User ||--o{ Feed : owns
   User ||--o{ Bookmark : creates
@@ -37,7 +32,7 @@ erDiagram
 
   User {
     string id PK
-    string email UK
+    string email
     string name
     string image
     datetime createdAt
@@ -91,8 +86,6 @@ erDiagram
 
 ## 3. 关键约束
 
-- `User.email` 唯一
-- `Account.provider + Account.providerAccountId` 唯一
 - `FeedCategory.userId + FeedCategory.name` 唯一
 - `Feed.userId + Feed.url` 唯一
 - `Article.feedId + Article.url` 唯一
@@ -112,9 +105,9 @@ erDiagram
 
 ## 5. 设计说明
 
-- `Account`、`Session`、`VerificationToken` 兼容 NextAuth Prisma Adapter
-- `Feed` 绑定用户，MVP 中每个用户管理自己的 RSS 源
+- 当前实现只保留一个系统用户，不包含认证相关表
+- `Feed` 绑定系统用户，便于后续平滑扩展回多用户模式
 - `Article` 绑定 Feed，文章去重优先依赖 URL 和 Guid
 - `ArticleSummary` 与 `Article` 一对一，摘要失败不影响文章存在
-- `Bookmark` 是用户维度数据
+- `Bookmark` 仍然保留用户维度，但当前用户固定为系统用户
 - V2 向量搜索可增加 `ArticleEmbedding` 表或 embedding 字段

@@ -6,11 +6,7 @@
 flowchart TB
   User["用户 / Developer"] --> Web["Next.js App Router 前端"]
 
-  Web --> Auth["NextAuth 认证层"]
   Web --> API["Next.js Route Handlers"]
-
-  Auth --> GitHub["GitHub OAuth"]
-  Auth --> DB["PostgreSQL"]
 
   API --> DB
   API --> OpenAI["OpenAI SDK"]
@@ -29,7 +25,7 @@ flowchart TB
 ```mermaid
 flowchart LR
   subgraph Frontend["Frontend: Next.js + TailwindCSS + shadcn/ui"]
-    Login["Login"]
+    Landing["Landing"]
     Dashboard["Dashboard"]
     FeedMgmt["Feed Management"]
     ArticleDetail["Article Detail"]
@@ -38,7 +34,7 @@ flowchart LR
   end
 
   subgraph Backend["Backend: Route Handlers"]
-    AuthAPI["Auth APIs"]
+    MeAPI["Me API"]
     FeedAPI["Feed APIs"]
     ArticleAPI["Article APIs"]
     BookmarkAPI["Bookmark APIs"]
@@ -93,16 +89,12 @@ sequenceDiagram
 sequenceDiagram
   participant User as User
   participant Web as Next.js Frontend
-  participant Auth as NextAuth
   participant API as Route Handlers
   participant DB as PostgreSQL
 
   User->>Web: 访问 Dashboard
-  Web->>Auth: 校验登录状态
-  Auth->>DB: 查询 Session / User
-  Auth-->>Web: 返回用户身份
   Web->>API: 请求 Briefing 列表
-  API->>DB: 查询用户 Feed 关联文章
+  API->>DB: 查询系统用户 Feed 关联文章
   DB-->>API: 返回文章与 AI 摘要
   API-->>Web: 返回分页数据
   Web-->>User: 展示 Briefing 卡片
@@ -120,7 +112,6 @@ flowchart TB
   NextApp --> RouteHandlers["Route Handlers"]
   RouteHandlers --> Postgres["PostgreSQL"]
   RouteHandlers --> OpenAI["OpenAI API"]
-  RouteHandlers --> GitHubOAuth["GitHub OAuth"]
 
   Cron --> RouteHandlers
 ```
@@ -128,11 +119,11 @@ flowchart TB
 ## 6. 架构边界
 
 - MVP 采用单体 Next.js 架构
-- 前端页面、API、认证、Cron 入口在同一个 Next.js 项目中
+- 前端页面、API、Cron 入口在同一个 Next.js 项目中
 - 业务逻辑放在 `src/services/`
 - 数据访问统一通过 Prisma
 - AI 调用封装为独立服务，便于后续替换模型或加入队列
-- Cron 接口需要鉴权
+- Cron 接口在配置 `CRON_SECRET` 时启用鉴权
 - 抓取和 AI 摘要失败不影响用户访问已有 Briefing
 
 ## 7. V2 预留点

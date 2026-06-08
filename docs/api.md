@@ -8,9 +8,9 @@ Base URL：
 /api
 ```
 
-业务接口默认需要登录。
+当前 MVP 采用单用户模式，业务接口不需要登录。
 
-Cron 接口使用服务端密钥保护：
+如果配置了 `CRON_SECRET`，Cron 接口使用服务端密钥保护；未配置时允许内网或本地直接调用：
 
 ```http
 Authorization: Bearer ${CRON_SECRET}
@@ -31,7 +31,7 @@ Authorization: Bearer ${CRON_SECRET}
 {
   "error": {
     "code": "UNAUTHORIZED",
-    "message": "请先登录"
+    "message": "未授权"
   }
 }
 ```
@@ -41,7 +41,7 @@ Authorization: Bearer ${CRON_SECRET}
 | Code               | HTTP | 说明         |
 | ------------------ | ---: | ------------ |
 | `BAD_REQUEST`      |  400 | 请求参数错误 |
-| `UNAUTHORIZED`     |  401 | 未登录       |
+| `UNAUTHORIZED`     |  401 | 未授权       |
 | `FORBIDDEN`        |  403 | 无权限       |
 | `NOT_FOUND`        |  404 | 资源不存在   |
 | `CONFLICT`         |  409 | 数据冲突     |
@@ -83,27 +83,17 @@ pageSize=100
 }
 ```
 
-## 4. Auth API
-
-NextAuth 内置路由：
-
-```txt
-/api/auth/[...nextauth]
-```
-
-支持：
-
-- Email 登录 / 注册
-- GitHub OAuth
-- Session 获取
-- Logout
-
-## 5. User API
+## 4. User API
 
 ```http
 GET /api/me
 PATCH /api/me
 ```
+
+说明：
+
+- 当前只维护一个系统用户，由服务端自动创建
+- `PATCH /api/me` 仅用于修改展示昵称和头像
 
 更新用户资料请求：
 
@@ -114,7 +104,7 @@ PATCH /api/me
 }
 ```
 
-## 6. Feed Category API
+## 5. Feed Category API
 
 ```http
 GET /api/feed-categories
@@ -135,7 +125,7 @@ DELETE /api/feed-categories/:id
 
 删除分类时，不删除 Feed，只将相关 Feed 的 `categoryId` 置空。
 
-## 7. Feed API
+## 6. Feed API
 
 ```http
 GET /api/feeds?categoryId=cat_123&status=ACTIVE&page=1&pageSize=20
@@ -158,9 +148,9 @@ DELETE /api/feeds/:id
 - 校验 URL 格式
 - 尝试读取 RSS 元信息
 - 提取默认标题
-- 防止同一用户重复添加同一 URL
+- 防止系统用户重复添加同一 URL
 
-## 8. Article API
+## 7. Article API
 
 ```http
 GET /api/articles?query=react&source=React%20Blog&page=1&pageSize=20
@@ -179,12 +169,9 @@ GET /api/articles/:id
 | `page`       | number  | 否   | 页码                 |
 | `pageSize`   | number  | 否   | 每页数量             |
 
-权限规则：
+当前实现为单用户模式，文章、Feed 和收藏都绑定到系统用户。
 
-- 用户只能看到自己 Feed 抓取到的文章
-- 用户不能访问其他用户 Feed 下的文章
-
-## 9. Bookmark API
+## 8. Bookmark API
 
 ```http
 GET /api/bookmarks?query=typescript&page=1&pageSize=20
@@ -200,7 +187,7 @@ DELETE /api/bookmarks/:articleId
 }
 ```
 
-## 10. Cron API
+## 9. Cron API
 
 ```http
 POST /api/cron/fetch-feeds

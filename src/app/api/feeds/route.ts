@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 import { created, fail, ok } from "@/lib/response";
 import { getPagination } from "@/lib/pagination";
 import { feedCreateSchema } from "@/lib/validations";
@@ -7,7 +7,7 @@ import { createFeed, listFeeds } from "@/services/feed-service";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const pagination = getPagination(request.nextUrl.searchParams);
     const { data, meta } = await listFeeds(user.id, pagination, {
       categoryId: request.nextUrl.searchParams.get("categoryId"),
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const input = feedCreateSchema.parse(await request.json());
     const feed = await createFeed(user.id, input);
 

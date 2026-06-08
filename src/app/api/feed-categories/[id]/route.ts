@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 import { fail, ok } from "@/lib/response";
 import { feedCategoryUpdateSchema, idSchema } from "@/lib/validations";
 import {
@@ -13,7 +13,7 @@ type RouteContext = {
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const { id } = await context.params;
     const input = feedCategoryUpdateSchema.parse(await request.json());
     const category = await updateFeedCategory(
@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
 export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const { id } = await context.params;
     const result = await deleteFeedCategory(user.id, idSchema.parse(id));
 

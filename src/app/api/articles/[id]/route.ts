@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 import { fail, ok } from "@/lib/response";
 import { idSchema } from "@/lib/validations";
 import { getArticleById } from "@/services/article-service";
@@ -10,7 +10,7 @@ type RouteContext = {
 
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const { id } = await context.params;
     const article = await getArticleById(user.id, idSchema.parse(id));
 

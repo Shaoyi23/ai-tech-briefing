@@ -1,18 +1,13 @@
-import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { UserMenu } from "@/components/app/user-menu";
-import { getCurrentUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
-
-  if (!user?.id) {
-    redirect("/login");
-  }
+  const user = await getAppUser();
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -26,7 +21,10 @@ export default async function DashboardLayout({
             <div className="hidden text-sm text-muted-foreground lg:block">
               Hourly AI technical intelligence briefing
             </div>
-            <UserMenu image={user.image} name={user.name ?? user.email} />
+            <UserMenu
+              image={user?.image}
+              name={user?.name ?? user?.email ?? "Guest Mode"}
+            />
           </header>
           {children}
         </div>

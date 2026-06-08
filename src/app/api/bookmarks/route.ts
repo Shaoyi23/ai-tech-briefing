@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getAppUser } from "@/lib/app-user";
 import { created, fail, ok } from "@/lib/response";
 import { getPagination } from "@/lib/pagination";
 import { bookmarkCreateSchema } from "@/lib/validations";
@@ -7,7 +7,7 @@ import { createBookmark, listBookmarks } from "@/services/bookmark-service";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const pagination = getPagination(request.nextUrl.searchParams);
     const query = request.nextUrl.searchParams.get("query") ?? undefined;
     const { data, meta } = await listBookmarks(user.id, pagination, { query });
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getAppUser();
     const input = bookmarkCreateSchema.parse(await request.json());
     const bookmark = await createBookmark(user.id, input.articleId);
 
