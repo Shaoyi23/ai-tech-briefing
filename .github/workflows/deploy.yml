@@ -13,6 +13,22 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      - name: Validate deployment secrets
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_PROJECT_PATH: ${{ secrets.SERVER_PROJECT_PATH }}
+        run: |
+          missing=0
+          for name in SERVER_HOST SERVER_USER SERVER_SSH_KEY SERVER_PROJECT_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required GitHub secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.2.0
         with:
