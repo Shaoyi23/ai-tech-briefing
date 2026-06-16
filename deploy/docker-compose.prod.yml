@@ -4,40 +4,6 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: runner
-    env_file:
-      - ${APP_ENV_FILE:-../.env.production}
-    restart: unless-stopped
-    networks:
-      - web
-
-  migrate:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: migrator
-    env_file:
-      - ${APP_ENV_FILE:-../.env.production}
-    profiles:
-      - tools
-    networks:
-      - web
-
-  cron:
-    image: curlimages/curl:8.17.0
-    env_file:
-      - ${APP_ENV_FILE:-../.env.production}
-    command:
-      - sh
-      - -c
-      - |
-        while true; do
-          curl -fsS -X POST \
-            -H "Authorization: Bearer $${CRON_SECRET}" \
-            http://app:3000/api/cron/fetch-feeds || true
-          sleep 3600
-        done
-    depends_on:
-      - app
     restart: unless-stopped
     networks:
       - web
@@ -45,7 +11,8 @@ services:
   caddy:
     image: caddy:2.10-alpine
     env_file:
-      - ${APP_ENV_FILE:-../.env.production}
+      - path: ${APP_ENV_FILE:-../.env.production}
+        required: false
     ports:
       - "80:80"
       - "443:443"

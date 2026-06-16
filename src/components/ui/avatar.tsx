@@ -1,5 +1,4 @@
 import * as React from "react";
-import Image, { type ImageProps } from "next/image";
 import { cn } from "@/lib/utils";
 
 export function Avatar({ className, ...props }: React.ComponentProps<"div">) {
@@ -18,13 +17,11 @@ export function AvatarImage({
   alt,
   className,
   ...props
-}: Omit<ImageProps, "width" | "height" | "alt"> & { alt: string }) {
+}: React.ComponentProps<"img"> & { alt: string }) {
   return (
-    <Image
+    <img
       alt={alt}
-      className={cn("object-cover", className)}
-      fill
-      sizes="40px"
+      className={cn("size-full object-cover", className)}
       {...props}
     />
   );

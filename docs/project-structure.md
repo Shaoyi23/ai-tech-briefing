@@ -2,86 +2,55 @@
 
 ```txt
 .
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── .husky/
-│   ├── commit-msg
-│   └── pre-commit
-├── docs/
-│   ├── api.md
-│   ├── architecture.md
-│   ├── database.md
-│   ├── deployment.md
-│   ├── prd.md
-│   └── project-structure.md
 ├── deploy/
 │   ├── Caddyfile
-│   └── docker-compose.prod.yml
-├── prisma/
-│   └── schema.prisma
+│   ├── docker-compose.prod.yml
+│   ├── docker-compose.server.yml
+│   └── nginx.conf
+├── docs/
 ├── public/
 ├── src/
-│   ├── app/
-│   │   ├── (auth)/
-│   │   ├── (dashboard)/
-│   │   └── api/
 │   ├── components/
-│   │   ├── app/
-│   │   ├── articles/
-│   │   ├── feeds/
 │   │   └── ui/
-│   ├── hooks/
+│   ├── data/
+│   │   └── mock.ts
 │   ├── lib/
-│   ├── services/
-│   ├── stores/
+│   │   └── utils.ts
 │   ├── test/
-│   └── types/
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── styles.css
 ├── tests/
 ├── Dockerfile
-├── docker-compose.yml
-├── next.config.ts
+├── index.html
 ├── package.json
-├── prisma.config.ts
-├── vercel.json
+├── postcss.config.mjs
+├── tsconfig.json
+├── vite.config.ts
 └── vitest.config.ts
 ```
 
-## 页面路由
+## 运行入口
 
-```txt
-/                  -> 首页
-/login             -> 功能预留占位页
-/dashboard         -> Briefing 信息流
-/feeds             -> RSS Feed 管理
-/articles/[id]     -> 文章详情
-/bookmarks         -> 收藏文章
-/settings          -> 用户设置
-```
+- `index.html`：浏览器入口
+- `src/main.tsx`：React 挂载入口
+- `src/App.tsx`：应用主界面
+- `src/data/mock.ts`：模拟数据
+- `src/styles.css`：全局样式和 Tailwind 主题变量
 
-## API 路由
+## 当前页面
 
-```txt
-/api/me                        -> 当前用户资料
-/api/feed-categories           -> 分类列表 / 创建
-/api/feed-categories/:id       -> 分类更新 / 删除
-/api/feeds                     -> Feed 列表 / 创建
-/api/feeds/:id                 -> Feed 更新 / 删除
-/api/articles                  -> Briefing 列表 / 搜索
-/api/articles/:id              -> 文章详情
-/api/bookmarks                 -> 收藏列表 / 创建收藏
-/api/bookmarks/:articleId      -> 取消收藏
-/api/cron/fetch-feeds          -> Vercel Cron 抓取任务
-```
+当前没有路由系统，所有视图在同一个前端应用内切换：
+
+- 技术简报
+- 订阅源
+- 收藏
+- 设置
 
 ## 分层原则
 
-- `app/`：页面和 Route Handlers
-- `components/`：UI 组件
-- `services/`：核心业务逻辑
-- `lib/`：基础设施能力
-- `hooks/`：TanStack Query hooks
-- `stores/`：Zustand 状态
-- `types/`：共享类型定义
-- `tests/`：单元测试和 service 测试
-- `deploy/`：生产部署相关 Docker Compose 和 Caddy 配置
+- `src/components/ui/`：轻量 UI 基础组件
+- `src/data/`：mock 数据
+- `src/lib/`：通用工具函数
+- `tests/`：单元测试
+- `deploy/`：Docker 和 Nginx 部署配置
