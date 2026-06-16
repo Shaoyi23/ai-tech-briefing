@@ -71,10 +71,13 @@ APP_DOMAIN=你的域名
 
 ## Docker 部署
 
-无域名部署，直接使用服务器公网 IP：
+当前 Dockerfile 使用本地构建好的 `dist/` 目录生成 Nginx 静态镜像。
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml up -d --build app
+npm run build
+docker build -t ai-tech-briefing .
+docker rm -f ai-tech-briefing || true
+docker run -d --name ai-tech-briefing -p 80:80 --restart unless-stopped ai-tech-briefing
 ```
 
 访问：
@@ -83,12 +86,22 @@ docker compose -f deploy/docker-compose.server.yml up -d --build app
 http://服务器公网IP
 ```
 
-带域名和 HTTPS 部署：
+## 自动部署
 
-```bash
-cp .env.production.example .env.production
-docker compose -f deploy/docker-compose.prod.yml up -d --build app caddy
+项目包含 GitHub Actions 自动部署流程：
+
+```txt
+Git Push -> GitHub Actions -> SSH 登录服务器 -> 拉取代码 -> 构建 dist -> 构建镜像 -> 重启容器
 ```
+
+需要在 GitHub 仓库 `Settings -> Secrets and variables -> Actions` 配置：
+
+- `SERVER_HOST`：服务器公网 IP
+- `SERVER_USER`：SSH 用户名
+- `SERVER_SSH_KEY`：SSH 私钥
+- `SERVER_PROJECT_PATH`：服务器上的项目目录，例如 `/opt/ai-tech-briefing`
+- `SERVER_PORT`：SSH 端口，可选，默认 `22`
+- `SERVER_APP_PORT`：网站访问端口，可选，默认 `80`
 
 ## 文档
 
