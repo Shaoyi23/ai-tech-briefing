@@ -1,105 +1,91 @@
-import { useDeferredValue, useEffect, useState } from "react";
-import {
-  Bookmark,
-  ExternalLink,
-  Newspaper,
-  Rss,
-  Search,
-  Settings,
-  Sparkles,
-} from "lucide-react";
+import { useDeferredValue, useEffect, useState, type FormEvent } from "react";
+import { ExternalLink, RefreshCcw, Search } from "lucide-react";
 import { articles, categories, feeds as mockFeeds } from "@/data/mock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { Article, Feed } from "@/data/mock";
 
-type View = "briefing" | "feeds" | "bookmarks" | "settings";
-
-const navItems: Array<{ id: View; label: string; icon: typeof Newspaper }> = [
-  { id: "briefing", label: "技术简报", icon: Newspaper },
-  { id: "feeds", label: "订阅源", icon: Rss },
-  { id: "bookmarks", label: "收藏", icon: Bookmark },
-  { id: "settings", label: "设置", icon: Settings },
-];
+type DataSource = "api" | "mock";
+type FeedDraft = {
+  title: string;
+  category: string;
+  url: string;
+};
 
 export function App() {
-  const [view, setView] = useState<View>("briefing");
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("全部");
-  const [briefingArticles, setBriefingArticles] = useState<Article[]>(articles);
+  const [selectedCategory, setSelectedCategory] = useState("全部");
+  const [selectedArticleId, setSelectedArticleId] = useState(articles[0]?.id);
+  const [articleList, setArticleList] = useState<Article[]>(articles);
   const [feedList, setFeedList] = useState<Feed[]>(mockFeeds);
-  const [dataSource, setDataSource] = useState<"api" | "mock">("mock");
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<string>>(
+    new Set(
+      articles.filter((article) => article.bookmarked).map((item) => item.id),
+    ),
+  );
+  const [dataSource, setDataSource] = useState<DataSource>("mock");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
-  useEffect(() => {
-    let canceled = false;
+  async function loadArticles() {
+    const response = await fetch("/api/articles");
 
-    async function loadArticles() {
-      try {
-        const response = await fetch("/api/articles");
-
-        if (!response.ok) {
-          throw new Error("接口请求失败");
-        }
-
-        const payload = (await response.json()) as { data?: Article[] };
-
-        if (!canceled && Array.isArray(payload.data)) {
-          setBriefingArticles(payload.data);
-          setDataSource("api");
-        }
-      } catch {
-        if (!canceled) {
-          setBriefingArticles(articles);
-          setDataSource("mock");
-        }
-      }
+    if (!response.ok) {
+      throw new Error("文章接口请求失败");
     }
 
-    void loadArticles();
+    const payload = (await response.json()) as { data?: Article[] };
 
-    return () => {
-      canceled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let canceled = false;
-
-    async function loadFeeds() {
-      try {
-        const response = await fetch("/api/feeds");
-
-        if (!response.ok) {
-          throw new Error("接口请求失败");
-        }
-
-        const payload = (await response.json()) as { data?: Feed[] };
-
-        if (!canceled && Array.isArray(payload.data)) {
-          setFeedList(payload.data);
-        }
-      } catch {
-        if (!canceled) {
-          setFeedList(mockFeeds);
-        }
-      }
+    if (!Array.isArray(payload.data)) {
+      throw new Error("文章接口返回格式不正确");
     }
 
-    void loadFeeds();
+    setArticleList(payload.data);
+    setDataSource("api");
+    setSelectedArticleId((current) => current ?? payload.data?.[0]?.id);
+  }
 
-    return () => {
-      canceled = true;
-    };
+  async function loadFeeds() {
+    const response = await fetch("/api/feeds");
+
+    if (!response.ok) {
+      throw new Error("订阅源接口请求失败");
+    }
+
+    const payload = (await response.json()) as { data?: Feed[] };
+
+    if (!Array.isArray(payload.data)) {
+      throw new Error("订阅源接口返回格式不正确");
+    }
+
+    setFeedList(payload.data);
+  }
+
+  async function refreshData() {
+    setIsRefreshing(true);
+
+    try {
+      await Promise.all([loadArticles(), loadFeeds()]);
+    } catch {
+      setArticleList(articles);
+      setFeedList(mockFeeds);
+      setDataSource("mock");
+      setSelectedArticleId((current) => current ?? articles[0]?.id);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshData();
   }, []);
 
-  const visibleArticles = briefingArticles.filter((article) => {
+  const visibleArticles = articleList.filter((article) => {
     const matchesCategory =
-      category === "全部" || article.category === category;
-    const matchesView = view !== "bookmarks" || article.bookmarked;
+      selectedCategory === "全部" || article.category === selectedCategory;
     const text = [
       article.title,
       article.translatedTitle,
@@ -110,288 +96,174 @@ export function App() {
       .join(" ")
       .toLowerCase();
 
-    return matchesCategory && matchesView && text.includes(deferredQuery);
+    return matchesCategory && text.includes(deferredQuery);
   });
+
+  const selectedArticle =
+    visibleArticles.find((article) => article.id === selectedArticleId) ??
+    visibleArticles[0] ??
+    articleList[0];
+
+  useEffect(() => {
+    if (!selectedArticle) {
+      return;
+    }
+
+    setSelectedArticleId(selectedArticle.id);
+  }, [selectedArticle]);
+
+  useEffect(() => {
+    function handleKeyboard(event: KeyboardEvent) {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      const currentIndex = visibleArticles.findIndex(
+        (article) => article.id === selectedArticle?.id,
+      );
+
+      if (event.key.toLowerCase() === "j") {
+        const next =
+          visibleArticles[
+            Math.min(currentIndex + 1, visibleArticles.length - 1)
+          ];
+        if (next) {
+          setSelectedArticleId(next.id);
+        }
+      }
+
+      if (event.key.toLowerCase() === "k") {
+        const next = visibleArticles[Math.max(currentIndex - 1, 0)];
+        if (next) {
+          setSelectedArticleId(next.id);
+        }
+      }
+
+      if (event.key.toLowerCase() === "m" && selectedArticle) {
+        setReadIds((current) => toggleSetValue(current, selectedArticle.id));
+      }
+
+      if (event.key.toLowerCase() === "s" && selectedArticle) {
+        setSavedIds((current) => toggleSetValue(current, selectedArticle.id));
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyboard);
+
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [selectedArticle, visibleArticles]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-sidebar px-5 py-6 text-sidebar-foreground lg:block">
-          <Brand />
-          <nav className="mt-10 flex flex-col gap-2">
-            {navItems.map((item) => (
-              <button
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-4 py-3 text-left text-sm text-sidebar-foreground/70 transition",
-                  view === item.id
-                    ? "bg-white/10 text-sidebar-foreground"
-                    : "hover:bg-white/8 hover:text-sidebar-foreground",
-                )}
-                key={item.id}
-                onClick={() => setView(item.id)}
-                type="button"
-              >
-                <item.icon className="size-4" />
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-5 md:px-8">
-            <Header
-              dataSource={dataSource}
-              view={view}
-              onChangeView={setView}
-            />
-            {view === "briefing" || view === "bookmarks" ? (
-              <BriefingView
-                category={category}
-                onCategoryChange={setCategory}
-                onQueryChange={setQuery}
-                query={query}
-                title={view === "bookmarks" ? "我的收藏" : "今日技术简报"}
-                articles={visibleArticles}
-                feedCount={feedList.length}
-              />
-            ) : null}
-            {view === "feeds" ? (
-              <FeedsView feeds={feedList} onFeedsChange={setFeedList} />
-            ) : null}
-            {view === "settings" ? <SettingsView /> : null}
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function Brand() {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-        AI
-      </div>
-      <div>
-        <div className="font-semibold tracking-tight">AI 技术简报</div>
-        <div className="text-xs text-sidebar-foreground/58">
-          开发者情报工作台
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Header({
-  dataSource,
-  view,
-  onChangeView,
-}: {
-  dataSource: "api" | "mock";
-  view: View;
-  onChangeView: (view: View) => void;
-}) {
-  return (
-    <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex items-center justify-between gap-4">
-        <div className="lg:hidden">
-          <Brand />
-        </div>
-        <div className="hidden lg:block">
-          <div className="text-sm text-muted-foreground">
-            当前数据来源：{dataSource === "api" ? "后端接口" : "模拟数据"}
-          </div>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-            AI 技术简报
-          </h1>
-        </div>
-      </div>
-      <div className="grid grid-cols-4 gap-2 lg:hidden">
-        {navItems.map((item) => (
-          <button
-            className={cn(
-              "flex h-11 items-center justify-center rounded-lg border border-border text-xs",
-              view === item.id
-                ? "bg-sidebar text-sidebar-foreground"
-                : "bg-card",
-            )}
-            key={item.id}
-            onClick={() => onChangeView(item.id)}
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-        <Sparkles className="size-4 text-primary" />
-        <span>前端与轻量后端已接通，数据库可逐步接入</span>
-      </div>
-    </header>
-  );
-}
-
-function BriefingView({
-  articles,
-  category,
-  onCategoryChange,
-  onQueryChange,
-  query,
-  title,
-  feedCount,
-}: {
-  articles: Article[];
-  category: string;
-  feedCount: number;
-  onCategoryChange: (category: string) => void;
-  onQueryChange: (query: string) => void;
-  query: string;
-  title: string;
-}) {
-  return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:px-5">
+        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              先用模拟数据验证整体信息流、搜索、分类和收藏体验。后续接入真实 RSS
-              抓取时，页面结构可以继续沿用。
+            <h1 className="text-lg font-semibold tracking-tight">
+              AI 技术简报
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              三栏阅读器 · {dataSource === "api" ? "真实接口" : "模拟数据"}
             </p>
           </div>
-          <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="搜索标题、摘要或来源"
-              value={query}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {categories.map((item) => (
-            <button
-              className={cn(
-                "rounded-full border px-4 py-2 text-sm transition",
-                category === item
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
-              )}
-              key={item}
-              onClick={() => onCategoryChange(item)}
-              type="button"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-4">
-          {articles.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-          {articles.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                暂时没有匹配的文章，换个关键词试试看。
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      </div>
-
-      <aside className="grid h-fit gap-4">
-        <StatCard label="今日文章" value="24" />
-        <StatCard label="已收藏" value="2" />
-        <StatCard label="订阅源" value={String(feedCount)} />
-      </aside>
-    </section>
-  );
-}
-
-function ArticleCard({ article }: { article: (typeof articles)[number] }) {
-  return (
-    <Card className="overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
-      <CardHeader className="gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{article.source}</span>
-            <span>·</span>
-            <span>{article.publishedAt}</span>
-          </div>
-          <Badge variant={article.bookmarked ? "default" : "outline"}>
-            {article.bookmarked ? "已收藏" : "未收藏"}
-          </Badge>
-        </div>
-        <div>
-          <CardTitle className="text-xl leading-snug">
-            {article.translatedTitle}
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-5">
-        <p className="text-sm leading-7 text-card-foreground/80">
-          {article.summary}
-        </p>
-        <div className="grid gap-2 rounded-lg bg-muted/70 p-4">
-          {article.keyPoints.map((point) => (
-            <div className="flex gap-2 text-sm" key={point}>
-              <span className="mt-2 size-1.5 rounded-full bg-primary" />
-              <span>{point}</span>
+          <div className="flex w-full items-center gap-2 lg:max-w-xl">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="h-10 rounded-lg border-border bg-card pl-9 text-sm"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索标题、摘要或来源"
+                value={query}
+              />
             </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {article.keywords.map((keyword) => (
-              <Badge key={keyword} variant="outline">
-                {keyword}
-              </Badge>
-            ))}
+            <Button
+              className="h-10 shrink-0 rounded-lg"
+              disabled={isRefreshing}
+              onClick={() => void refreshData()}
+              type="button"
+              variant="outline"
+            >
+              <RefreshCcw
+                className={cn("size-4", isRefreshing ? "animate-spin" : "")}
+              />
+              刷新
+            </Button>
           </div>
-          <a
-            className="inline-flex items-center gap-2 text-sm font-medium text-primary"
-            href={article.url}
-            rel="noreferrer"
-            target="_blank"
-          >
-            查看原文
-            <ExternalLink className="size-4" />
-          </a>
         </div>
-      </CardContent>
-    </Card>
+      </header>
+
+      <main className="mx-auto grid max-w-[1480px] gap-0 lg:h-[calc(100vh-65px)] lg:grid-cols-[248px_minmax(360px,460px)_minmax(0,1fr)]">
+        <SourceSidebar
+          feeds={feedList}
+          selectedCategory={selectedCategory}
+          onFeedsChange={setFeedList}
+          onSelectCategory={setSelectedCategory}
+        />
+        <ArticleList
+          articles={visibleArticles}
+          readIds={readIds}
+          savedIds={savedIds}
+          selectedArticleId={selectedArticle?.id}
+          onSelectArticle={(article) => {
+            setSelectedArticleId(article.id);
+            setReadIds((current) => new Set(current).add(article.id));
+          }}
+        />
+        <ReaderPane
+          article={selectedArticle}
+          isRead={selectedArticle ? readIds.has(selectedArticle.id) : false}
+          isSaved={selectedArticle ? savedIds.has(selectedArticle.id) : false}
+          onToggleRead={() => {
+            if (selectedArticle) {
+              setReadIds((current) =>
+                toggleSetValue(current, selectedArticle.id),
+              );
+            }
+          }}
+          onToggleSaved={() => {
+            if (selectedArticle) {
+              setSavedIds((current) =>
+                toggleSetValue(current, selectedArticle.id),
+              );
+            }
+          }}
+        />
+      </main>
+    </div>
   );
 }
 
-function FeedsView({
+function SourceSidebar({
   feeds,
+  selectedCategory,
   onFeedsChange,
+  onSelectCategory,
 }: {
   feeds: Feed[];
+  selectedCategory: string;
   onFeedsChange: (feeds: Feed[]) => void;
+  onSelectCategory: (category: string) => void;
 }) {
-  const [form, setForm] = useState({
+  const [draft, setDraft] = useState<FeedDraft>({
     title: "",
     category: "",
     url: "",
   });
-  const [message, setMessage] = useState("订阅源数据已接入后端接口。");
+  const [message, setMessage] = useState("订阅源已接入接口");
   const [isSaving, setIsSaving] = useState(false);
 
-  async function handleCreateFeed(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateFeed(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
-    setMessage("正在保存订阅源...");
+    setMessage("正在保存...");
 
     try {
       const response = await fetch("/api/feeds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, status: "正常" }),
+        body: JSON.stringify({ ...draft, status: "正常" }),
       });
       const payload = (await response.json()) as {
         data?: Feed;
@@ -403,8 +275,8 @@ function FeedsView({
       }
 
       onFeedsChange([payload.data, ...feeds]);
-      setForm({ title: "", category: "", url: "" });
-      setMessage("订阅源已保存。");
+      setDraft({ title: "", category: "", url: "" });
+      setMessage("已添加订阅源");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "新增订阅源失败。");
     } finally {
@@ -413,7 +285,7 @@ function FeedsView({
   }
 
   async function handleDeleteFeed(feed: Feed) {
-    setMessage(`正在删除「${feed.title}」...`);
+    setMessage("正在删除...");
 
     try {
       const response = await fetch(`/api/feeds/${feed.id}`, {
@@ -428,169 +300,298 @@ function FeedsView({
       }
 
       onFeedsChange(feeds.filter((item) => item.id !== feed.id));
-      setMessage("订阅源已删除。");
+      setMessage("已删除订阅源");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "删除订阅源失败。");
     }
   }
 
-  async function handleToggleStatus(feed: Feed) {
-    const nextStatus = feed.status === "正常" ? "暂停" : "正常";
-    setMessage(`正在更新「${feed.title}」状态...`);
+  return (
+    <aside className="border-b border-border bg-sidebar/55 px-4 py-4 lg:h-full lg:border-b-0 lg:border-r lg:px-4 lg:py-5">
+      <div className="mb-6">
+        <div className="text-sm font-semibold tracking-tight">信息源</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {feeds.length} 个订阅源
+        </div>
+      </div>
 
-    try {
-      const response = await fetch(`/api/feeds/${feed.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      const payload = (await response.json()) as {
-        data?: Feed;
-        error?: { message?: string };
-      };
+      <nav className="grid gap-1">
+        {categories.map((category) => (
+          <button
+            className={cn(
+              "flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition",
+              selectedCategory === category
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-card/70 hover:text-foreground",
+            )}
+            key={category}
+            onClick={() => onSelectCategory(category)}
+            type="button"
+          >
+            <span>{category}</span>
+            <span className="text-xs">
+              {category === "全部"
+                ? feeds.length
+                : feeds.filter((feed) => feed.category === category).length}
+            </span>
+          </button>
+        ))}
+      </nav>
 
-      if (!response.ok || !payload.data) {
-        throw new Error(payload.error?.message ?? "更新订阅源失败。");
-      }
+      <div className="mt-7">
+        <div className="mb-2 text-xs font-medium text-muted-foreground">
+          订阅源
+        </div>
+        <div className="grid gap-1">
+          {feeds.map((feed) => (
+            <div
+              className="group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-card/70 hover:text-foreground"
+              key={feed.id}
+            >
+              <button
+                className="min-w-0 flex-1 truncate text-left"
+                onClick={() => onSelectCategory(feed.category)}
+                title={feed.title}
+                type="button"
+              >
+                {feed.title}
+              </button>
+              <span className="text-xs">{feed.articleCount}</span>
+              <button
+                className="text-xs opacity-0 transition group-hover:opacity-100"
+                onClick={() => void handleDeleteFeed(feed)}
+                type="button"
+              >
+                删除
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      onFeedsChange(
-        feeds.map((item) => (item.id === feed.id ? payload.data! : item)),
-      );
-      setMessage("订阅源状态已更新。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "更新订阅源失败。");
-    }
+      <form className="mt-7 grid gap-2" onSubmit={handleCreateFeed}>
+        <div className="text-xs font-medium text-muted-foreground">
+          添加 RSS
+        </div>
+        <Input
+          className="h-9 bg-card text-sm"
+          onChange={(event) =>
+            setDraft((current) => ({ ...current, title: event.target.value }))
+          }
+          placeholder="名称"
+          required
+          value={draft.title}
+        />
+        <Input
+          className="h-9 bg-card text-sm"
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              category: event.target.value,
+            }))
+          }
+          placeholder="分类"
+          required
+          value={draft.category}
+        />
+        <Input
+          className="h-9 bg-card text-sm"
+          onChange={(event) =>
+            setDraft((current) => ({ ...current, url: event.target.value }))
+          }
+          placeholder="RSS 地址"
+          required
+          type="url"
+          value={draft.url}
+        />
+        <Button className="h-9 rounded-lg" disabled={isSaving} type="submit">
+          {isSaving ? "保存中" : "添加订阅源"}
+        </Button>
+        <p className="text-xs leading-5 text-muted-foreground">{message}</p>
+      </form>
+    </aside>
+  );
+}
+
+function ArticleList({
+  articles,
+  readIds,
+  savedIds,
+  selectedArticleId,
+  onSelectArticle,
+}: {
+  articles: Article[];
+  readIds: Set<string>;
+  savedIds: Set<string>;
+  selectedArticleId?: string;
+  onSelectArticle: (article: Article) => void;
+}) {
+  return (
+    <section className="border-b border-border bg-background lg:h-full lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      <div className="sticky top-[65px] z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">未读文章</h2>
+            <p className="text-xs text-muted-foreground">
+              {articles.length} 条结果 · J/K 切换
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 p-3">
+        {articles.map((article) => {
+          const isRead = readIds.has(article.id);
+          const isSelected = selectedArticleId === article.id;
+
+          return (
+            <button
+              className={cn(
+                "rounded-xl border border-transparent bg-card px-4 py-3 text-left transition hover:border-border",
+                isSelected ? "border-primary/35 ring-1 ring-primary/25" : "",
+                isRead ? "opacity-60" : "",
+              )}
+              key={article.id}
+              onClick={() => onSelectArticle(article)}
+              type="button"
+            >
+              <div className="flex items-start gap-2">
+                <span
+                  className={cn(
+                    "mt-1.5 size-2 shrink-0 rounded-full",
+                    isRead ? "bg-transparent" : "bg-primary",
+                  )}
+                />
+                <div className="min-w-0 flex-1">
+                  <h3
+                    className={cn(
+                      "line-clamp-2 text-[15px] leading-snug tracking-tight",
+                      isRead ? "font-medium" : "font-semibold",
+                    )}
+                  >
+                    {article.translatedTitle}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{article.source}</span>
+                    <span>·</span>
+                    <span>{article.publishedAt}</span>
+                    {savedIds.has(article.id) ? <span>· 已收藏</span> : null}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                    {article.summary}
+                  </p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+
+        {articles.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            没有匹配的文章，换个关键词试试看。
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ReaderPane({
+  article,
+  isRead,
+  isSaved,
+  onToggleRead,
+  onToggleSaved,
+}: {
+  article?: Article;
+  isRead: boolean;
+  isSaved: boolean;
+  onToggleRead: () => void;
+  onToggleSaved: () => void;
+}) {
+  if (!article) {
+    return (
+      <section className="grid min-h-[50vh] place-items-center px-6 text-sm text-muted-foreground lg:h-full">
+        请选择一篇文章开始阅读。
+      </section>
+    );
   }
 
   return (
-    <section className="grid gap-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">订阅源管理</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          添加 RSS 地址并按主题分类。抓取任务会在后续版本接入。
-        </p>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>新增订阅源</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="grid gap-4 lg:grid-cols-[1fr_160px_1.5fr_auto]"
-            onSubmit={handleCreateFeed}
-          >
-            <Input
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  title: event.target.value,
-                }))
-              }
-              placeholder="订阅源名称"
-              required
-              value={form.title}
-            />
-            <Input
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  category: event.target.value,
-                }))
-              }
-              placeholder="分类"
-              required
-              value={form.category}
-            />
-            <Input
-              onChange={(event) =>
-                setForm((current) => ({ ...current, url: event.target.value }))
-              }
-              placeholder="RSS 地址"
-              required
-              type="url"
-              value={form.url}
-            />
-            <Button disabled={isSaving} type="submit">
-              {isSaving ? "保存中" : "添加"}
-            </Button>
-          </form>
-          <p className="mt-3 text-sm text-muted-foreground">{message}</p>
-        </CardContent>
-      </Card>
-      <div className="grid gap-4 md:grid-cols-2">
-        {feeds.map((feed) => (
-          <Card key={feed.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle>{feed.title}</CardTitle>
-                  <p className="mt-2 break-all text-sm text-muted-foreground">
-                    {feed.url}
-                  </p>
-                </div>
-                <Badge>{feed.status}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-4 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">{feed.category}</span>
-                <span>{feed.articleCount} 篇文章</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => void handleToggleStatus(feed)}
-                  type="button"
-                  variant="outline"
-                >
-                  {feed.status === "正常" ? "暂停" : "恢复"}
-                </Button>
-                <Button
-                  onClick={() => void handleDeleteFeed(feed)}
-                  type="button"
-                  variant="outline"
-                >
-                  删除
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SettingsView() {
-  return (
-    <section className="max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>项目状态</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 text-sm leading-7 text-muted-foreground">
-          <p>
-            当前版本是 Vite React
-            静态前端，不连接数据库，也不需要登录。部署到服务器后可以直接访问页面，后续再逐步接入
-            RSS 抓取、AI 摘要和持久化存储。
-          </p>
-          <Button className="w-fit" type="button">
-            当前无需配置
-          </Button>
-        </CardContent>
-      </Card>
-    </section>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="text-sm text-muted-foreground">{label}</div>
-        <div className="mt-2 text-3xl font-semibold tracking-tight">
-          {value}
+    <article className="bg-card lg:h-full lg:overflow-y-auto">
+      <div className="mx-auto max-w-[740px] px-5 py-8 md:px-8 lg:py-12">
+        <div className="mb-7 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>{article.source}</span>
+          <span>·</span>
+          <span>{article.publishedAt}</span>
+          <span>·</span>
+          <span>{isRead ? "已读" : "未读"}</span>
         </div>
-      </CardContent>
-    </Card>
+
+        <h2 className="text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
+          {article.translatedTitle}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          原标题：{article.title}
+        </p>
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {article.keywords.map((keyword) => (
+            <Badge className="rounded-md" key={keyword} variant="outline">
+              {keyword}
+            </Badge>
+          ))}
+        </div>
+
+        <div className="mt-8 flex flex-wrap gap-2">
+          <Button onClick={onToggleRead} type="button" variant="outline">
+            {isRead ? "标为未读" : "标为已读"}
+          </Button>
+          <Button onClick={onToggleSaved} type="button" variant="outline">
+            {isSaved ? "取消收藏" : "收藏"}
+          </Button>
+          <a
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            href={article.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            查看原文
+            <ExternalLink className="size-4" />
+          </a>
+        </div>
+
+        <div className="mt-10 space-y-7 text-[17px] leading-[1.75] text-card-foreground">
+          <p>{article.summary}</p>
+          <section>
+            <h3 className="mb-3 text-base font-semibold">核心观点</h3>
+            <ul className="space-y-3">
+              {article.keyPoints.map((point) => (
+                <li className="flex gap-3" key={point}>
+                  <span className="mt-3 size-1.5 shrink-0 rounded-full bg-primary" />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <div className="mt-12 rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
+          快捷键：J 下一篇，K 上一篇，M 标记已读，S 收藏。
+        </div>
+      </div>
+    </article>
   );
+}
+
+function toggleSetValue(values: Set<string>, value: string) {
+  const next = new Set(values);
+
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+
+  return next;
 }
