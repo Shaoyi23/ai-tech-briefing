@@ -74,15 +74,72 @@ GET /api/articles
 GET /api/feeds
 ```
 
-当前返回 mock 数据，后续再接 Supabase。
+未配置 Supabase 时返回 mock 数据。配置 Supabase 后读取 `feeds` 表。
 
-## 后续再做
+返回字段：
 
-等数据库稳定后再增加：
+- `id`
+- `title`
+- `category`
+- `url`
+- `status`
+- `articleCount`
+
+## 新增订阅源
 
 ```http
 POST /api/feeds
+```
+
+请求体：
+
+```json
+{
+  "title": "React 官方博客",
+  "category": "前端",
+  "url": "https://react.dev/blog/rss.xml",
+  "status": "正常"
+}
+```
+
+说明：
+
+- `title` 必填
+- `category` 必填
+- `url` 必填，必须是合法 URL
+- `status` 可选，只允许 `正常` 或 `暂停`
+
+## 更新订阅源
+
+```http
+PATCH /api/feeds/:id
+```
+
+请求体可以传部分字段：
+
+```json
+{
+  "status": "暂停"
+}
+```
+
+## 删除订阅源
+
+```http
 DELETE /api/feeds/:id
+```
+
+成功时返回：
+
+```http
+204 No Content
+```
+
+## 后续再做
+
+等 RSS 抓取和用户系统稳定后再增加：
+
+```http
 POST /api/bookmarks
 DELETE /api/bookmarks/:articleId
 ```

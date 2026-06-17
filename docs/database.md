@@ -16,6 +16,12 @@ src/data/mock.ts
 supabase/schema.sql
 ```
 
+如果只想补订阅源管理相关表和策略，可以运行：
+
+```txt
+supabase/feed-management.sql
+```
+
 使用方式：
 
 1. 打开 Supabase 项目后台

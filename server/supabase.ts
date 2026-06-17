@@ -14,6 +14,17 @@ export type ArticleRow = {
   bookmarked: boolean | null;
 };
 
+export type FeedRow = {
+  id: string;
+  title: string;
+  category: string;
+  url: string;
+  status: "正常" | "暂停";
+  article_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export function createSupabaseServerClient() {
   const url = process.env.SUPABASE_URL;
   const key =

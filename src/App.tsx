@@ -8,13 +8,13 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
-import { articles, categories, feeds } from "@/data/mock";
+import { articles, categories, feeds as mockFeeds } from "@/data/mock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { Article } from "@/data/mock";
+import type { Article, Feed } from "@/data/mock";
 
 type View = "briefing" | "feeds" | "bookmarks" | "settings";
 
@@ -30,6 +30,7 @@ export function App() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
   const [briefingArticles, setBriefingArticles] = useState<Article[]>(articles);
+  const [feedList, setFeedList] = useState<Feed[]>(mockFeeds);
   const [dataSource, setDataSource] = useState<"api" | "mock">("mock");
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
@@ -59,6 +60,36 @@ export function App() {
     }
 
     void loadArticles();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let canceled = false;
+
+    async function loadFeeds() {
+      try {
+        const response = await fetch("/api/feeds");
+
+        if (!response.ok) {
+          throw new Error("接口请求失败");
+        }
+
+        const payload = (await response.json()) as { data?: Feed[] };
+
+        if (!canceled && Array.isArray(payload.data)) {
+          setFeedList(payload.data);
+        }
+      } catch {
+        if (!canceled) {
+          setFeedList(mockFeeds);
+        }
+      }
+    }
+
+    void loadFeeds();
 
     return () => {
       canceled = true;
@@ -122,9 +153,12 @@ export function App() {
                 query={query}
                 title={view === "bookmarks" ? "我的收藏" : "今日技术简报"}
                 articles={visibleArticles}
+                feedCount={feedList.length}
               />
             ) : null}
-            {view === "feeds" ? <FeedsView /> : null}
+            {view === "feeds" ? (
+              <FeedsView feeds={feedList} onFeedsChange={setFeedList} />
+            ) : null}
             {view === "settings" ? <SettingsView /> : null}
           </div>
         </main>
@@ -205,9 +239,11 @@ function BriefingView({
   onQueryChange,
   query,
   title,
+  feedCount,
 }: {
   articles: Article[];
   category: string;
+  feedCount: number;
   onCategoryChange: (category: string) => void;
   onQueryChange: (query: string) => void;
   query: string;
@@ -270,7 +306,7 @@ function BriefingView({
       <aside className="grid h-fit gap-4">
         <StatCard label="今日文章" value="24" />
         <StatCard label="已收藏" value="2" />
-        <StatCard label="订阅源" value={String(feeds.length)} />
+        <StatCard label="订阅源" value={String(feedCount)} />
       </aside>
     </section>
   );
@@ -331,15 +367,156 @@ function ArticleCard({ article }: { article: (typeof articles)[number] }) {
   );
 }
 
-function FeedsView() {
+function FeedsView({
+  feeds,
+  onFeedsChange,
+}: {
+  feeds: Feed[];
+  onFeedsChange: (feeds: Feed[]) => void;
+}) {
+  const [form, setForm] = useState({
+    title: "",
+    category: "",
+    url: "",
+  });
+  const [message, setMessage] = useState("订阅源数据已接入后端接口。");
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleCreateFeed(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setMessage("正在保存订阅源...");
+
+    try {
+      const response = await fetch("/api/feeds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, status: "正常" }),
+      });
+      const payload = (await response.json()) as {
+        data?: Feed;
+        error?: { message?: string };
+      };
+
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.error?.message ?? "新增订阅源失败。");
+      }
+
+      onFeedsChange([payload.data, ...feeds]);
+      setForm({ title: "", category: "", url: "" });
+      setMessage("订阅源已保存。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "新增订阅源失败。");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteFeed(feed: Feed) {
+    setMessage(`正在删除「${feed.title}」...`);
+
+    try {
+      const response = await fetch(`/api/feeds/${feed.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as {
+          error?: { message?: string };
+        };
+        throw new Error(payload.error?.message ?? "删除订阅源失败。");
+      }
+
+      onFeedsChange(feeds.filter((item) => item.id !== feed.id));
+      setMessage("订阅源已删除。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "删除订阅源失败。");
+    }
+  }
+
+  async function handleToggleStatus(feed: Feed) {
+    const nextStatus = feed.status === "正常" ? "暂停" : "正常";
+    setMessage(`正在更新「${feed.title}」状态...`);
+
+    try {
+      const response = await fetch(`/api/feeds/${feed.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload = (await response.json()) as {
+        data?: Feed;
+        error?: { message?: string };
+      };
+
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.error?.message ?? "更新订阅源失败。");
+      }
+
+      onFeedsChange(
+        feeds.map((item) => (item.id === feed.id ? payload.data! : item)),
+      );
+      setMessage("订阅源状态已更新。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "更新订阅源失败。");
+    }
+  }
+
   return (
     <section className="grid gap-6">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">订阅源管理</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          当前展示模拟订阅源。真实新增、删除和抓取功能会在后续版本接入。
+          添加 RSS 地址并按主题分类。抓取任务会在后续版本接入。
         </p>
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>新增订阅源</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-4 lg:grid-cols-[1fr_160px_1.5fr_auto]"
+            onSubmit={handleCreateFeed}
+          >
+            <Input
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+              placeholder="订阅源名称"
+              required
+              value={form.title}
+            />
+            <Input
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  category: event.target.value,
+                }))
+              }
+              placeholder="分类"
+              required
+              value={form.category}
+            />
+            <Input
+              onChange={(event) =>
+                setForm((current) => ({ ...current, url: event.target.value }))
+              }
+              placeholder="RSS 地址"
+              required
+              type="url"
+              value={form.url}
+            />
+            <Button disabled={isSaving} type="submit">
+              {isSaving ? "保存中" : "添加"}
+            </Button>
+          </form>
+          <p className="mt-3 text-sm text-muted-foreground">{message}</p>
+        </CardContent>
+      </Card>
       <div className="grid gap-4 md:grid-cols-2">
         {feeds.map((feed) => (
           <Card key={feed.id}>
@@ -354,9 +531,27 @@ function FeedsView() {
                 <Badge>{feed.status}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-muted-foreground">{feed.category}</span>
-              <span>{feed.articleCount} 篇文章</span>
+            <CardContent className="grid gap-4 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">{feed.category}</span>
+                <span>{feed.articleCount} 篇文章</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void handleToggleStatus(feed)}
+                  type="button"
+                  variant="outline"
+                >
+                  {feed.status === "正常" ? "暂停" : "恢复"}
+                </Button>
+                <Button
+                  onClick={() => void handleDeleteFeed(feed)}
+                  type="button"
+                  variant="outline"
+                >
+                  删除
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}

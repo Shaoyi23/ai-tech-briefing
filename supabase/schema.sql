@@ -43,6 +43,12 @@ create index if not exists articles_source_idx
 create index if not exists articles_bookmarked_idx
   on public.articles (bookmarked);
 
+create index if not exists feeds_category_idx
+  on public.feeds (category);
+
+create index if not exists feeds_status_idx
+  on public.feeds (status);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
