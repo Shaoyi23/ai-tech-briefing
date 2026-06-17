@@ -17,6 +17,7 @@ type FeedDraft = {
 export function App() {
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("全部");
+  const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState(articles[0]?.id);
   const [articleList, setArticleList] = useState<Article[]>(articles);
   const [feedList, setFeedList] = useState<Feed[]>(mockFeeds);
@@ -84,8 +85,10 @@ export function App() {
   }, []);
 
   const visibleArticles = articleList.filter((article) => {
+    const selectedFeed = feedList.find((feed) => feed.id === selectedFeedId);
     const matchesCategory =
       selectedCategory === "全部" || article.category === selectedCategory;
+    const matchesFeed = !selectedFeed || article.source === selectedFeed.title;
     const text = [
       article.title,
       article.translatedTitle,
@@ -96,13 +99,15 @@ export function App() {
       .join(" ")
       .toLowerCase();
 
-    return matchesCategory && text.includes(deferredQuery);
+    return matchesCategory && matchesFeed && text.includes(deferredQuery);
   });
 
   const selectedArticle =
     visibleArticles.find((article) => article.id === selectedArticleId) ??
     visibleArticles[0] ??
     articleList[0];
+  const selectedFeed = feedList.find((feed) => feed.id === selectedFeedId);
+  const articleListTitle = selectedFeed?.title ?? selectedCategory;
 
   useEffect(() => {
     if (!selectedArticle) {
@@ -198,11 +203,17 @@ export function App() {
         <SourceSidebar
           feeds={feedList}
           selectedCategory={selectedCategory}
+          selectedFeedId={selectedFeedId}
           onFeedsChange={setFeedList}
-          onSelectCategory={setSelectedCategory}
+          onSelectCategory={(category) => {
+            setSelectedCategory(category);
+            setSelectedFeedId(null);
+          }}
+          onSelectFeed={setSelectedFeedId}
         />
         <ArticleList
           articles={visibleArticles}
+          title={articleListTitle}
           readIds={readIds}
           savedIds={savedIds}
           selectedArticleId={selectedArticle?.id}
@@ -238,13 +249,17 @@ export function App() {
 function SourceSidebar({
   feeds,
   selectedCategory,
+  selectedFeedId,
   onFeedsChange,
   onSelectCategory,
+  onSelectFeed,
 }: {
   feeds: Feed[];
   selectedCategory: string;
+  selectedFeedId: string | null;
   onFeedsChange: (feeds: Feed[]) => void;
   onSelectCategory: (category: string) => void;
+  onSelectFeed: (feedId: string | null) => void;
 }) {
   const [draft, setDraft] = useState<FeedDraft>({
     title: "",
@@ -345,12 +360,19 @@ function SourceSidebar({
         <div className="grid gap-1">
           {feeds.map((feed) => (
             <div
-              className="group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-card/70 hover:text-foreground"
+              className={cn(
+                "group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-card/70 hover:text-foreground",
+                selectedFeedId === feed.id
+                  ? "bg-card text-foreground shadow-sm"
+                  : "",
+              )}
               key={feed.id}
             >
               <button
                 className="min-w-0 flex-1 truncate text-left"
-                onClick={() => onSelectCategory(feed.category)}
+                onClick={() =>
+                  onSelectFeed(selectedFeedId === feed.id ? null : feed.id)
+                }
                 title={feed.title}
                 type="button"
               >
@@ -415,12 +437,14 @@ function SourceSidebar({
 
 function ArticleList({
   articles,
+  title,
   readIds,
   savedIds,
   selectedArticleId,
   onSelectArticle,
 }: {
   articles: Article[];
+  title: string;
   readIds: Set<string>;
   savedIds: Set<string>;
   selectedArticleId?: string;
@@ -431,7 +455,7 @@ function ArticleList({
       <div className="sticky top-[65px] z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold">未读文章</h2>
+            <h2 className="text-base font-semibold">{title}</h2>
             <p className="text-xs text-muted-foreground">
               {articles.length} 条结果 · J/K 切换
             </p>
