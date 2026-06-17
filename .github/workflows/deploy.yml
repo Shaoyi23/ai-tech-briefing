@@ -46,7 +46,8 @@ jobs:
             node -v
             npm -v
             cd ${{ secrets.SERVER_PROJECT_PATH }}
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             npm ci
             npm run build
             docker build -t ai-tech-briefing .
