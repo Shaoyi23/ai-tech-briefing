@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 
 const eslintConfig = tseslint.config(
   {
-    ignores: [".next/**", "dist/**", "node_modules/**"],
+    ignores: [".next/**", "dist/**", "server-dist/**", "node_modules/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -17,7 +17,9 @@ const eslintConfig = tseslint.config(
         ...globals.node,
       },
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["server/*.ts"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

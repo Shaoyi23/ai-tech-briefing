@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import {
   Bookmark,
   ExternalLink,
@@ -29,9 +29,43 @@ export function App() {
   const [view, setView] = useState<View>("briefing");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
+  const [briefingArticles, setBriefingArticles] = useState<Article[]>(articles);
+  const [dataSource, setDataSource] = useState<"api" | "mock">("mock");
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
-  const visibleArticles = articles.filter((article) => {
+  useEffect(() => {
+    let canceled = false;
+
+    async function loadArticles() {
+      try {
+        const response = await fetch("/api/articles");
+
+        if (!response.ok) {
+          throw new Error("接口请求失败");
+        }
+
+        const payload = (await response.json()) as { data?: Article[] };
+
+        if (!canceled && Array.isArray(payload.data)) {
+          setBriefingArticles(payload.data);
+          setDataSource("api");
+        }
+      } catch {
+        if (!canceled) {
+          setBriefingArticles(articles);
+          setDataSource("mock");
+        }
+      }
+    }
+
+    void loadArticles();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
+  const visibleArticles = briefingArticles.filter((article) => {
     const matchesCategory =
       category === "全部" || article.category === category;
     const matchesView = view !== "bookmarks" || article.bookmarked;
@@ -75,7 +109,11 @@ export function App() {
 
         <main className="min-w-0 flex-1">
           <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-5 md:px-8">
-            <Header view={view} onChangeView={setView} />
+            <Header
+              dataSource={dataSource}
+              view={view}
+              onChangeView={setView}
+            />
             {view === "briefing" || view === "bookmarks" ? (
               <BriefingView
                 category={category}
@@ -112,9 +150,11 @@ function Brand() {
 }
 
 function Header({
+  dataSource,
   view,
   onChangeView,
 }: {
+  dataSource: "api" | "mock";
   view: View;
   onChangeView: (view: View) => void;
 }) {
@@ -126,7 +166,7 @@ function Header({
         </div>
         <div className="hidden lg:block">
           <div className="text-sm text-muted-foreground">
-            当前版本使用模拟数据
+            当前数据来源：{dataSource === "api" ? "后端接口" : "模拟数据"}
           </div>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">
             AI 技术简报
@@ -152,7 +192,7 @@ function Header({
       </div>
       <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
         <Sparkles className="size-4 text-primary" />
-        <span>静态前端已就绪，后端功能后续逐步接入</span>
+        <span>前端与轻量后端已接通，数据库可逐步接入</span>
       </div>
     </header>
   );

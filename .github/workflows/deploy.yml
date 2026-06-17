@@ -48,12 +48,13 @@ jobs:
             cd ${{ secrets.SERVER_PROJECT_PATH }}
             git fetch origin main
             git reset --hard origin/main
-            npm ci
-            npm run build
             docker build -t ai-tech-briefing .
             docker rm -f ai-tech-briefing || true
             docker run -d \
               --name ai-tech-briefing \
               -p ${{ secrets.SERVER_APP_PORT || '80' }}:80 \
+              -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+              -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -e SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
               --restart unless-stopped \
               ai-tech-briefing

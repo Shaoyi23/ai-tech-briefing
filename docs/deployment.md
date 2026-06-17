@@ -1,8 +1,8 @@
 # 腾讯云 Docker 部署流程
 
-当前项目是 Vite React 静态前端，生产构建产物为 `dist/`，Docker 运行时使用 Nginx 托管静态文件。
+当前项目是 Vite React + Express 轻量全栈应用。Dockerfile 会在容器内构建前端 `dist/` 和后端 `server-dist/`，运行时由 Express 同时提供静态页面和 `/api/*` 接口。
 
-当前版本不需要数据库、不需要 OpenAI Key、不需要 Cron，也不需要登录配置。
+当前版本不需要 OpenAI Key、Cron 和登录配置。Supabase 是可选配置，不配置时接口会返回 mock 数据。
 
 ## 1. 无域名部署
 
@@ -11,7 +11,6 @@
 服务器要求：
 
 - 已安装 Docker
-- 已安装 Docker Compose
 - 安全组开放 `80/tcp`
 
 在服务器上拉取代码：
@@ -24,19 +23,21 @@ cd ai-tech-briefing
 启动：
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml up -d --build app
+docker build -t ai-tech-briefing .
+docker rm -f ai-tech-briefing || true
+docker run -d --name ai-tech-briefing -p 80:80 --restart unless-stopped ai-tech-briefing
 ```
 
 查看状态：
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml ps
+docker ps --filter name=ai-tech-briefing
 ```
 
 查看日志：
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml logs -f app
+docker logs -f ai-tech-briefing
 ```
 
 访问：
@@ -45,64 +46,53 @@ docker compose -f deploy/docker-compose.server.yml logs -f app
 http://服务器公网IP
 ```
 
-## 2. 带域名部署
+## 2. Supabase 环境变量
 
-后续如果要使用域名和 HTTPS，可以使用 Caddy。
-
-`.env.production` 只需要：
-
-```env
-APP_DOMAIN=你的域名
-```
-
-启动：
+如果要连接 Supabase，在服务器容器启动时传入：
 
 ```bash
-docker compose -f deploy/docker-compose.prod.yml up -d --build app caddy
+docker run -d \
+  --name ai-tech-briefing \
+  -p 80:80 \
+  -e SUPABASE_URL="你的 Supabase URL" \
+  -e SUPABASE_SERVICE_ROLE_KEY="你的服务端密钥" \
+  --restart unless-stopped \
+  ai-tech-briefing
 ```
 
-查看状态：
-
-```bash
-docker compose -f deploy/docker-compose.prod.yml ps
-```
+不要把 `SUPABASE_SERVICE_ROLE_KEY` 写进前端代码或提交到仓库。
 
 ## 3. 更新部署
 
-无域名：
+手动更新：
 
 ```bash
 git pull
-docker compose -f deploy/docker-compose.server.yml up -d --build app
+docker build -t ai-tech-briefing .
+docker rm -f ai-tech-briefing || true
+docker run -d --name ai-tech-briefing -p 80:80 --restart unless-stopped ai-tech-briefing
 ```
 
-带域名：
-
-```bash
-git pull
-docker compose -f deploy/docker-compose.prod.yml up -d --build app caddy
-```
+GitHub Actions 自动部署会执行同等流程。
 
 ## 4. 停止服务
 
-无域名：
-
 ```bash
-docker compose -f deploy/docker-compose.server.yml down
+docker rm -f ai-tech-briefing
 ```
 
-带域名：
-
-```bash
-docker compose -f deploy/docker-compose.prod.yml down
-```
-
-## 5. 当前不需要的步骤
+## 5. 当前不做
 
 这些能力会在后续版本再接入：
 
-- Supabase 数据库
 - RSS 抓取任务
 - OpenAI 摘要
 - 登录和用户系统
 - 定时任务
+
+## 6. 接口检查
+
+```bash
+curl http://服务器公网IP/api/health
+curl http://服务器公网IP/api/articles
+```

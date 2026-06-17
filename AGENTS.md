@@ -11,13 +11,14 @@
 
 ## 当前目标
 
-项目当前阶段是轻量展示版 MVP。
+项目当前阶段是轻量全栈 MVP。
 
 核心目标：
 
 - 使用 Vite React 展示 AI 技术简报界面
-- 使用 mock 数据
-- 不连接数据库
+- 使用 Express 提供轻量后端 API
+- 默认使用 mock 数据
+- 可选接入 Supabase 免费数据库
 - 不接入登录
 - 不调用 OpenAI
 - 能部署到腾讯云服务器 Docker 内访问
@@ -30,17 +31,17 @@
 - TypeScript
 - Tailwind CSS
 - lucide-react
+- Express
+- Supabase JS
 - Vitest
-- Docker + Nginx
+- Docker + Node.js
 
 ## 当前不做
 
 除非用户明确要求，不要主动加入：
 
 - Next.js
-- 数据库
 - Prisma
-- Supabase
 - NextAuth
 - OAuth 登录
 - RSS 后端抓取
@@ -49,13 +50,14 @@
 
 ## 架构原则
 
-- 当前是纯前端静态应用。
+- 当前是 Vite React + Express 单仓应用。
 - 入口是 `src/main.tsx`。
 - 主界面在 `src/App.tsx`。
+- 后端入口是 `server/index.ts`。
 - 模拟数据放在 `src/data/mock.ts`。
 - UI 基础组件放在 `src/components/ui/`。
-- 不新增后端 API。
-- 不新增环境变量，除非部署 Caddy 域名需要 `APP_DOMAIN`。
+- 前端优先请求 `/api/articles`，失败时回退到 mock 数据。
+- Supabase 密钥只允许放在服务端环境变量，禁止写入前端代码。
 
 ## UI 规范
 
@@ -69,6 +71,7 @@
 
 ```bash
 npm run dev
+npm run dev:api
 npm run build
 npm run lint
 npm run typecheck
@@ -78,16 +81,12 @@ npm run format:check
 
 ## 部署
 
-无域名服务器部署：
+服务器部署：
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml up -d --build app
-```
-
-带域名部署：
-
-```bash
-docker compose -f deploy/docker-compose.prod.yml up -d --build app caddy
+docker build -t ai-tech-briefing .
+docker rm -f ai-tech-briefing || true
+docker run -d --name ai-tech-briefing -p 80:80 --restart unless-stopped ai-tech-briefing
 ```
 
 ## 提交规范
