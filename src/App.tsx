@@ -1,4 +1,11 @@
-import { useDeferredValue, useEffect, useState, type FormEvent } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 import { ExternalLink, RefreshCcw, Search } from "lucide-react";
 import { articles, categories, feeds as mockFeeds } from "@/data/mock";
 import { Badge } from "@/components/ui/badge";
@@ -68,16 +75,22 @@ export function App() {
   async function refreshData() {
     setIsRefreshing(true);
 
-    try {
-      await Promise.all([loadArticles(), loadFeeds()]);
-    } catch {
+    const [articleResult, feedResult] = await Promise.allSettled([
+      loadArticles(),
+      loadFeeds(),
+    ]);
+
+    if (articleResult.status === "rejected") {
       setArticleList(articles);
-      setFeedList(mockFeeds);
       setDataSource("mock");
       setSelectedArticleId((current) => current ?? articles[0]?.id);
-    } finally {
-      setIsRefreshing(false);
     }
+
+    if (feedResult.status === "rejected") {
+      setFeedList(mockFeeds);
+    }
+
+    setIsRefreshing(false);
   }
 
   useEffect(() => {
@@ -257,7 +270,7 @@ function SourceSidebar({
   feeds: Feed[];
   selectedCategory: string;
   selectedFeedId: string | null;
-  onFeedsChange: (feeds: Feed[]) => void;
+  onFeedsChange: Dispatch<SetStateAction<Feed[]>>;
   onSelectCategory: (category: string) => void;
   onSelectFeed: (feedId: string | null) => void;
 }) {
@@ -289,7 +302,7 @@ function SourceSidebar({
         throw new Error(payload.error?.message ?? "新增订阅源失败。");
       }
 
-      onFeedsChange([payload.data, ...feeds]);
+      onFeedsChange((current) => [payload.data!, ...current]);
       setDraft({ title: "", category: "", url: "" });
       setMessage("已添加订阅源");
     } catch (error) {
@@ -314,7 +327,7 @@ function SourceSidebar({
         throw new Error(payload.error?.message ?? "删除订阅源失败。");
       }
 
-      onFeedsChange(feeds.filter((item) => item.id !== feed.id));
+      onFeedsChange((current) => current.filter((item) => item.id !== feed.id));
       setMessage("已删除订阅源");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "删除订阅源失败。");
