@@ -2,7 +2,6 @@ import "dotenv/config";
 
 import express from "express";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   articles as mockArticles,
   feeds as mockFeeds,
@@ -13,8 +12,7 @@ import { createSupabaseServerClient, type ArticleRow } from "./supabase.js";
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 const supabase = createSupabaseServerClient();
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.resolve(currentDir, "../dist");
+const publicDir = path.resolve(process.cwd(), "dist");
 
 app.use(express.json());
 
